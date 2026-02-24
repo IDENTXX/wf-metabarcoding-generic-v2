@@ -1,29 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "title": "Generic Metabarcoding Workflow",
+  "title": "Test",
   "type": "object",
   "properties": {
-    "reads": { 
-      "type": "string", 
-      "title": "Reads Ordner" 
-    },
-    "db_choice": { 
-      "type": "string", 
-      "title": "Referenzdatenbank",
-      "enum": ["oomycetes_cox", "fusarium_tef", "custom_fasta"], 
-      "default": "oomycetes_cox" 
-    },
-    "custom_db_path": { 
-      "type": "string", 
-      "title": "Eigener Datenbank-Pfad (Optional)" 
-    },
-    "out_dir": { 
-      "type": "string", 
-      "title": "Output Verzeichnis", 
-      "default": "output" 
-    },
-    "min_identity": { "type": "number", "default": 90 },
-    "min_coverage": { "type": "number", "default": 80 }
-  },
-  "required": ["reads", "db_choice"]
+    "reads": { "type": "string" }
+  }
 }
