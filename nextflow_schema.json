@@ -1,6 +1,5 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema",
-  "$id": "https://raw.githubusercontent.com/IDENTXX/wf-metabarcoding/main/nextflow_schema.json",
   "title": "Generic Metabarcoding Workflow",
   "description": "Metabarcoding Analyse mit flexibler Datenbank-Auswahl",
   "type": "object",
@@ -29,7 +28,6 @@
         },
         "custom_db_path": {
           "type": "string",
-          "format": "file-path",
           "title": "Eigener Datenbank-Pfad",
           "description": "Nur auszufüllen, wenn oben 'custom_fasta' gewählt wurde.",
           "hidden": true
