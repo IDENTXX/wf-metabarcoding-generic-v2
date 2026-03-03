@@ -140,7 +140,7 @@ process AGGREGATE_RESULTS {
   container = null
   publishDir "${params.out_dir}/summary", mode: 'copy', overwrite: true
   input: path(tables)
-  output: tuple path("wf-metagenomics-counts-species.csv"), path("abundance_matrix.csv")
+  output: tuple path("wf-metagenomics-counts-species.csv"), path("abundance_matrix.csv"), path("homology_qc_report.csv")
   script:
   """
   printf "sample\\tcluster_id\\tread_count\\tbest_sseqid\\tpident\\tqcovs\\tbest_hit_title\\n" > raw_combined.tsv
@@ -155,6 +155,7 @@ import csv
 import re
 
 data, all_samples, all_species = {}, set(), set()
+homology_stats = {} # Speichert pident-Werte für die QC
 
 def clean_name(raw_title):
     if "Unclassified" in raw_title: return "Unclassified"
@@ -181,8 +182,21 @@ with open('raw_combined.tsv', 'r') as f:
         sa = row['sample']
         all_samples.add(sa)
         all_species.add(sp)
+        
+        count = int(row['read_count']) if row['read_count'].isdigit() else 0
+        try:
+            pident = float(row['pident'])
+        except ValueError:
+            pident = 0.0
+
         if sp not in data: data[sp] = {}
-        data[sp][sa] = data[sp].get(sa, 0) + int(row['read_count'] if row['read_count'].isdigit() else 0)
+        data[sp][sa] = data[sp].get(sa, 0) + count
+
+        # Homologie-Werte sammeln (nur für echte Treffer)
+        if sp not in homology_stats:
+            homology_stats[sp] = []
+        if sp != "Unclassified" and sp != "Unknown" and pident > 0:
+            homology_stats[sp].append((pident, count))
 
 sorted_samples = sorted(list(all_samples))
 sorted_species = sorted(list(all_species))
@@ -200,6 +214,30 @@ with open('abundance_matrix.csv', 'w') as out:
     out.write(','.join(['species'] + sorted_samples) + '\\n')
     for sp in sorted_species:
         out.write(','.join([sp] + [str(data[sp].get(sa, 0)) for sa in sorted_samples]) + '\\n')
+
+# Output: Homology QC Report erstellen
+with open('homology_qc_report.csv', 'w') as out_qc:
+    out_qc.write("species,mean_id_%,min_%,max_%\\n")
+    for sp in sorted_species:
+        if sp in ["Unclassified", "Unknown"]:
+            out_qc.write(f'"{sp}",NA,NA,NA\\n')
+            continue
+            
+        sp_data = homology_stats.get(sp, [])
+        if not sp_data:
+            out_qc.write(f'"{sp}",NA,NA,NA\\n')
+            continue
+            
+        total_reads = sum(c for p, c in sp_data)
+        if total_reads == 0:
+            out_qc.write(f'"{sp}",NA,NA,NA\\n')
+            continue
+            
+        mean_val = sum(p * c for p, c in sp_data) / total_reads
+        min_val = min(p for p, c in sp_data)
+        max_val = max(p for p, c in sp_data)
+        
+        out_qc.write(f'"{sp}",{mean_val:.2f},{min_val:.2f},{max_val:.2f}\\n')
 PY
   """
 }
@@ -207,7 +245,7 @@ PY
 process REPORT_HTML {
   container = null
   publishDir "${params.out_dir}", mode: 'copy', overwrite: true
-  input: tuple path(metagenomics_csv), path(matrix_csv)
+  input: tuple path(metagenomics_csv), path(matrix_csv), path(qc_csv)
   output: path("wf-metabarcoding-report.html")
   script:
   """
@@ -218,6 +256,7 @@ html = f'''<!doctype html><html><head><meta charset="utf-8"/><title>Metabarcodin
 </head><body><h1>Generic Metabarcoding Report</h1><div class="box"><h3>Ergebnisse</h3><ul>
 <li><a href="summary/{Path("${metagenomics_csv}").name}" target="_blank">Metagenomics Counts</a></li>
 <li><a href="summary/{Path("${matrix_csv}").name}" target="_blank">Abundance Matrix</a></li>
+<li><a href="summary/{Path("${qc_csv}").name}" target="_blank">Homology QC Report</a></li>
 </ul></div></body></html>'''
 with open("wf-metabarcoding-report.html", "w", encoding="utf-8") as f: f.write(html)
 PY
